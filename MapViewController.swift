@@ -40,7 +40,7 @@ class MapViewController: UIViewController, CLLocationManagerDelegate, GMSMapView
     var maxAlt: Float = Float(Int.min)
     var minAlt: Float = Float(Int.max)
     
-    func saveAltitudeMeters(){
+    func saveAltitudeMeters(){  // This method loads the intial user preferences if required
         if loadAltitudeMeters() == 0.0 {
             NSUserDefaults.standardUserDefaults().setDouble(3.28084, forKey: "altitudeMeters")
         }
@@ -64,20 +64,20 @@ class MapViewController: UIViewController, CLLocationManagerDelegate, GMSMapView
         return NSUserDefaults.standardUserDefaults().doubleForKey("trueHeading")
     }
     
-    func startAltimeterUpdate() {
+    func startAltimeterUpdate() {  // Called to initiate altitude updates if device has a barometer, must continue in background state
         self.altimeter.startRelativeAltitudeUpdatesToQueue(NSOperationQueue.currentQueue(),
             withHandler: { (altdata:CMAltitudeData!, error:NSError!) -> Void in
                 self.handleNewMeasure(pressureData: altdata)
         })
     }
     
-    func handleNewMeasure(#pressureData: CMAltitudeData) {
+    func handleNewMeasure(#pressureData: CMAltitudeData) {  //Records last altitude to array in appDelegate
         let appDelegate = (UIApplication.sharedApplication().delegate as AppDelegate)
         self.altitude = pressureData.relativeAltitude.floatValue
         appDelegate.altitudes.append(self.altitude*3.28084)
     }
     
-    func updateViewWithNewAlt(#meter :Float) {
+    func updateViewWithNewAlt(#meter :Float) {  //Records max/min altitude
         let newAlt = meter - self.offset
         if newAlt > self.maxAlt {
             self.maxAlt = newAlt
@@ -87,7 +87,7 @@ class MapViewController: UIViewController, CLLocationManagerDelegate, GMSMapView
         }
     }
 
-    func locationManager(manager: CLLocationManager!, didChangeAuthorizationStatus status: CLAuthorizationStatus) {
+    func locationManager(manager: CLLocationManager!, didChangeAuthorizationStatus status: CLAuthorizationStatus) { //Begins location updates when access granted by user
         if status == .Authorized {
             locationManager.startUpdatingLocation()
             mapView.myLocationEnabled = true
@@ -95,7 +95,7 @@ class MapViewController: UIViewController, CLLocationManagerDelegate, GMSMapView
         }
     }
     
-    func locationManager(manager: CLLocationManager!, didUpdateHeading newHeading: CLHeading!) {
+    func locationManager(manager: CLLocationManager!, didUpdateHeading newHeading: CLHeading!) {  //This thread provides the direction of the device, can be canceled when app is in background
         let appDelegate = (UIApplication.sharedApplication().delegate as AppDelegate)
         let HeadingThread = NSOperationQueue()
         HeadingThread.name = "Heading Update"
@@ -114,7 +114,7 @@ class MapViewController: UIViewController, CLLocationManagerDelegate, GMSMapView
         }
     }
 
-    func locationManager(manager: CLLocationManager!, didUpdateLocations locations: [AnyObject]!) {
+    func locationManager(manager: CLLocationManager!, didUpdateLocations locations: [AnyObject]!) { // This thread provides all of the heavy lifting, critical that it continues even in background state.
         
         let MapThread = NSOperationQueue()
         MapThread.name = "Map Update"
@@ -132,22 +132,22 @@ class MapViewController: UIViewController, CLLocationManagerDelegate, GMSMapView
             if self.StartandStop.titleLabel?.text == "Stop Flight" || self.StartandStop.titleLabel?.text == "Arrêtez" {
                 if let mylocation = self.mapView.myLocation as CLLocation? {
                     let appDelegate = (UIApplication.sharedApplication().delegate as AppDelegate)
-                    if CMAltimeter.isRelativeAltitudeAvailable() {
+                    if CMAltimeter.isRelativeAltitudeAvailable() { // If barometer available, updates altitude
                         println("Check")
                         appDelegate.maxAltitude = NSString(format: "%.01f", self.maxAlt*3.28084) + " Ft"
                         //appDelegate.altitudes.append(self.altitude*3.28084)
                     }
                     else {
-                        let relativeAlt = (self.mapView.myLocation as CLLocation).altitude - appDelegate.elevation //
+                        let relativeAlt = (self.mapView.myLocation as CLLocation).altitude - appDelegate.elevation // Provides altitude to devices without barometer
                         appDelegate.altitudes.append(Float(relativeAlt)*3.28084)
                         if Float(relativeAlt)*3.28084 > self.maxAlt {
                             self.maxAlt = Float(relativeAlt)*3.28084
                             appDelegate.maxAltitude = NSString(format: "%.01f", Float(relativeAlt)*3.28084) + " Ft"
                         }
                     }
-                    var lastDistance = self.Distance(self.lastLocation, Coordinate2: (self.mapView.myLocation as CLLocation).coordinate)
+                    var lastDistance = self.Distance(self.lastLocation, Coordinate2: (self.mapView.myLocation as CLLocation).coordinate) //App determines distance traveled
                     self.distance += lastDistance
-                    var lastSpeed = Float((self.mapView.myLocation as CLLocation).speed)
+                    var lastSpeed = Float((self.mapView.myLocation as CLLocation).speed) // Speed is recorded
                     if lastSpeed < 0 {
                         appDelegate.groundspeeds.append(0.0)
                     }
@@ -166,7 +166,7 @@ class MapViewController: UIViewController, CLLocationManagerDelegate, GMSMapView
                     self.latitudes.append((self.mapView.myLocation as CLLocation).coordinate.latitude)
                     self.longditudes.append((self.mapView.myLocation as CLLocation).coordinate.longitude)
                     GMSPolyline(path: self.path).map = self.mapView
-                    self.mapView.camera = GMSCameraPosition(target: self.mapView.myLocation.coordinate as CLLocationCoordinate2D, zoom: 17, bearing: 0, viewingAngle: 0)
+                    self.mapView.camera = GMSCameraPosition(target: self.mapView.myLocation.coordinate as CLLocationCoordinate2D, zoom: 17, bearing: 0, viewingAngle: 0) // Map camera updated
                     self.lastLocation = (self.mapView.myLocation as CLLocation).coordinate
                 }
             }
@@ -179,7 +179,7 @@ class MapViewController: UIViewController, CLLocationManagerDelegate, GMSMapView
     }
     
     
-    func Distance(Coordinate1: CLLocationCoordinate2D, Coordinate2: CLLocationCoordinate2D) -> Float {
+    func Distance(Coordinate1: CLLocationCoordinate2D, Coordinate2: CLLocationCoordinate2D) -> Float { // Computes distance travelled
         var R: Float = 6371.0;
         var φ1 = GLKMathDegreesToRadians(Float(Coordinate1.latitude))
         var φ2 = GLKMathDegreesToRadians(Float(Coordinate2.latitude))
@@ -195,7 +195,7 @@ class MapViewController: UIViewController, CLLocationManagerDelegate, GMSMapView
     }
 
     
-    func screenShot() {
+    func screenShot() { // Prepares view for final screenshot
         mapView.padding = UIEdgeInsetsMake(0.0, 0.0, 0.0, 0.0)
         mapView.settings.myLocationButton = false
         //mapView.myLocationEnabled = false
@@ -217,7 +217,7 @@ class MapViewController: UIViewController, CLLocationManagerDelegate, GMSMapView
         self.finished = true
     }
     
-    func mapView(view: GMSMapView, idleAtCameraPosition position: GMSCameraPosition) {
+    func mapView(view: GMSMapView, idleAtCameraPosition position: GMSCameraPosition) { //Captures final map view
         if self.finished == true {
             UIGraphicsBeginImageContext(mapView.frame.size)
             mapView.layer.renderInContext(UIGraphicsGetCurrentContext())
@@ -237,7 +237,7 @@ class MapViewController: UIViewController, CLLocationManagerDelegate, GMSMapView
         }
     }
     
-    func SaveFlight(mapImage: UIImage, path: GMSMutablePath, pathBounds: [CLLocationCoordinate2D]) {
+    func SaveFlight(mapImage: UIImage, path: GMSMutablePath, pathBounds: [CLLocationCoordinate2D]) { // Saves session parameters at the end
         let save = FileSave()
         var mapData: NSData = UIImagePNGRepresentation(mapImage)
         var pathData: String = String(path.encodedPath())
@@ -308,7 +308,7 @@ class MapViewController: UIViewController, CLLocationManagerDelegate, GMSMapView
         }
     }
  
-    @IBAction func StartandStop(sender: AnyObject) {
+    @IBAction func StartandStop(sender: AnyObject) { // This IBAction is connected to the UIButton that starts and stops the app's tracking features
         
         if (StartandStop.titleLabel?.text == "Start Flight" || StartandStop.titleLabel?.text == "Démarrez") && mapView.myLocation != nil {
             timer.invalidate()
